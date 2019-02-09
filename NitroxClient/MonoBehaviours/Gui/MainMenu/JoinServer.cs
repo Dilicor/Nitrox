@@ -3,13 +3,19 @@ using System.Collections;
 using NitroxClient.Communication.Abstract;
 using NitroxClient.Communication.Exceptions;
 using NitroxClient.Communication.MultiplayerSession;
-using NitroxClient.GameLogic.PlayerModelBuilder;
+using NitroxClient.GameLogic.PlayerModel;
+using NitroxClient.GameLogic.PlayerModel.Abstract;
+using NitroxClient.GameLogic.PlayerModel.ColorSwap;
+using NitroxClient.GameLogic.PlayerModel.ColorSwap.Strategy;
+using NitroxClient.Communication.MultiplayerSession.ConnectionState;
+using NitroxClient.Communication.NetworkingLayer.LiteNetLib;
 using NitroxClient.GameLogic.PlayerPreferences;
 using NitroxClient.Unity.Helper;
 using NitroxModel.Core;
 using NitroxModel.Helper;
 using NitroxModel.Logger;
 using NitroxModel.MultiplayerSession;
+using NitroxModel.Networking;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -55,13 +61,13 @@ namespace NitroxClient.MonoBehaviours.Gui.MainMenu
 
             float hue;
             float saturation;
-            float vibrance;
+            float vibrancy;
 
             Color playerColor = new Color(activePlayerPreference.RedAdditive, activePlayerPreference.GreenAdditive, activePlayerPreference.BlueAdditive);
 
-            Color.RGBToHSV(playerColor, out hue, out saturation, out vibrance);
+            Color.RGBToHSV(playerColor, out hue, out saturation, out vibrancy);
             uGUI_ColorPicker colorPicker = playerSettingsPanel.GetComponentInChildren<uGUI_ColorPicker>();
-            colorPicker.SetHSB(new Vector3(hue, 1f, vibrance));
+            colorPicker.SetHSB(new Vector3(hue, 1f, vibrancy));
 
             GameObject playerNameInputFieldGameObject = playerSettingsPanel.RequireGameObject("InputField");
 
@@ -147,13 +153,14 @@ namespace NitroxClient.MonoBehaviours.Gui.MainMenu
             if (multiplayerClient == null)
             {
                 multiplayerClient = new GameObject();
+                multiplayerClient.name = "Multiplayer Client";
                 multiplayerClient.AddComponent<Multiplayer>();
                 multiplayerSession.ConnectionStateChanged += SessionConnectionStateChangedHandler;
             }
 
             try
             {
-                multiplayerSession.Connect(ServerIp,serverPort);
+                multiplayerSession.Connect(ServerIp, serverPort);
             }
             catch (ClientConnectionFailedException)
             {
@@ -241,7 +248,7 @@ namespace NitroxClient.MonoBehaviours.Gui.MainMenu
                         () =>
                         {
                             multiplayerSession.Disconnect();
-                            multiplayerSession.Connect(ServerIp,serverPort);
+                            multiplayerSession.Connect(ServerIp, serverPort);
                         });
 
                     break;
@@ -278,7 +285,7 @@ namespace NitroxClient.MonoBehaviours.Gui.MainMenu
                 multiplayerSession.ConnectionStateChanged -= SessionConnectionStateChangedHandler;
             }
         }
-        
+
         //This method merges the cloned color picker element with the existing template for menus that appear in the "right side" region of Subnautica's main menu.
         private void InitializeJoinMenu()
         {
@@ -289,7 +296,7 @@ namespace NitroxClient.MonoBehaviours.Gui.MainMenu
             RightSideMainMenu.groups.Add(joinServerMenu);
 
             //Not sure what is up with this menu, but we have to use the RectTransform of the Image component as the parent for our color picker panel.
-            //Most of the UI elements seem to vanish behind this Image otherwise. 
+            //Most of the UI elements seem to vanish behind this Image otherwise.
             RectTransform joinServerBackground = joinServerMenu.GetComponent<Image>().rectTransform;
             joinServerBackground.anchorMin = new Vector2(0.5f, 0.5f);
             joinServerBackground.anchorMax = new Vector2(0.5f, 0.5f);
@@ -316,7 +323,7 @@ namespace NitroxClient.MonoBehaviours.Gui.MainMenu
             return joinServerMenu;
         }
 
-        //This configures and re-positions the elements on the default "ColorGrayscale" menu to suite our purposes now. 
+        //This configures and re-positions the elements on the default "ColorGrayscale" menu to suite our purposes now.
         private void InitializePlayerSettingsPanel(RectTransform joinServerBackground)
         {
             GameObject playerSettingsPanel = CloneColorPickerPanelPrototype();
@@ -350,7 +357,7 @@ namespace NitroxClient.MonoBehaviours.Gui.MainMenu
             colorPickerCanvasGroup.ignoreParentGroups = true;
             colorPickerCanvasGroup.interactable = true;
 
-            //Destroy everything that we know we will not be using. 
+            //Destroy everything that we know we will not be using.
             Destroy(playerSettingsPanel.transform.parent);
             Destroy(playerSettingsPanel.GetComponent<uGUI_NavigableControlGrid>());
             Destroy(playerSettingsPanel.GetComponent<Image>());
@@ -427,10 +434,12 @@ namespace NitroxClient.MonoBehaviours.Gui.MainMenu
 
             //This removes the extra "tabs" from the base texture.
             Texture2D newBaseTabTexture = baseTabBackgroundImage.sprite.texture.Clone();
-            HsvColorFilter baseTabBackgroundColorFilter = new HsvColorFilter(-1f, -1f, -1f, 0f);
-            baseTabBackgroundColorFilter.AddHueRange(185f, 215f);
-            baseTabBackgroundColorFilter.AddAlphaRange(0f, 175f);
-            newBaseTabTexture.ApplyFiltersToBlock(3, 3, 160, (int)(baseTabBackgroundImage.sprite.textureRect.height - 71f), baseTabBackgroundColorFilter);
+            TextureBlock textureBlock = new TextureBlock(3, 3, 160, (int)(baseTabBackgroundImage.sprite.textureRect.height - 71f));
+            IColorSwapStrategy alphaChannelSwapper = new AlphaChannelSwapper(0f);
+            HsvSwapper baseTabBackgroundSwapper = new HsvSwapper(alphaChannelSwapper);
+            baseTabBackgroundSwapper.SetHueRange(185f, 215f);
+            baseTabBackgroundSwapper.SetAlphaRange(0f, 175f);
+            newBaseTabTexture.SwapTextureColors(baseTabBackgroundSwapper, textureBlock);
             baseTabBackgroundImage.sprite = Sprite.Create(newBaseTabTexture, new Rect(baseTabBackgroundImage.sprite.textureRect), new Vector2(0f, 0f));
         }
 

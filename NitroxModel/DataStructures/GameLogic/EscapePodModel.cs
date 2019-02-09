@@ -1,21 +1,34 @@
 ﻿using System;
 using System.Collections.Generic;
+using ProtoBuf;
 using UnityEngine;
 
 namespace NitroxModel.DataStructures.GameLogic
 {
     [Serializable]
+    [ProtoContract]
     public class EscapePodModel
     {
-        public string Guid { get; }
-        public Vector3 Location { get; }
-        public string FabricatorGuid { get; }
-        public string MedicalFabricatorGuid { get; }
-        public string StorageContainerGuid { get; }
-        public string RadioGuid { get; }
-        public List<ushort> AssignedPlayers { get; } = new List<ushort>();
+        [ProtoMember(1)]
+        public string Guid { get; set; }
+        [ProtoMember(2)]
+        public Vector3 Location { get; set; }
+        [ProtoMember(3)]
+        public string FabricatorGuid { get; set; }
+        [ProtoMember(4)]
+        public string MedicalFabricatorGuid { get; set; }
+        [ProtoMember(5)]
+        public string StorageContainerGuid { get; set; }
+        [ProtoMember(6)]
+        public string RadioGuid { get; set; }
+        [ProtoMember(7)]
+        public List<ushort> AssignedPlayers { get; set; } = new List<ushort>();
+        [ProtoMember(8)]
+        public bool Damaged { get; set; }
+        [ProtoMember(9)]
+        public bool RadioDamaged { get; set; }
 
-        public EscapePodModel(string guid, Vector3 location, string fabricatorGuid, string medicalFabricatorGuid, string storageContainerGuid, string radioGuid)
+        public void InitEscapePodModel(string guid, Vector3 location, string fabricatorGuid, string medicalFabricatorGuid, string storageContainerGuid, string radioGuid, bool damaged, bool radioDamaged)
         {
             Guid = guid;
             Location = location;
@@ -23,6 +36,8 @@ namespace NitroxModel.DataStructures.GameLogic
             MedicalFabricatorGuid = medicalFabricatorGuid;
             StorageContainerGuid = storageContainerGuid;
             RadioGuid = radioGuid;
+            Damaged = damaged;
+            RadioDamaged = radioDamaged;
         }
 
         public override string ToString()
@@ -34,7 +49,7 @@ namespace NitroxModel.DataStructures.GameLogic
                 toString += playerId + " ";
             }
 
-            return toString + "}]";
+            return toString + "} Damaged: " + Damaged + " RadioDamaged: " + RadioDamaged + "]";
         }
     }
 }

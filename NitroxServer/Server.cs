@@ -1,66 +1,68 @@
-﻿using NitroxModel.Logger;
+﻿using System.Timers;
+using NitroxModel.Core;
+using NitroxModel.Logger;
+using NitroxModel.Networking;
 using NitroxServer.Communication;
-using NitroxServer.Communication.Packets;
+using NitroxServer.Communication.NetworkingLayer.Lidgren;
+using NitroxServer.Communication.NetworkingLayer.LiteNetLib;
 using NitroxServer.Serialization.World;
-using System.Timers;
 using NitroxServer.ConfigParser;
-using NitroxServer.ConsoleCommands.Processor;
-
 
 namespace NitroxServer
 {
     public class Server
     {
-        private readonly World world;
-        private readonly UdpServer udpServer;
-        private readonly WorldPersistence worldPersistence;
-        private readonly PacketHandler packetHandler;
         private readonly Timer saveTimer;
-        private ServerConfig serverConfiguration;
-        public static Server Instance;
+        private Communication.NetworkingLayer.NitroxServer server;
+        private readonly World world;
+        private readonly WorldPersistence worldPersistence;
+        public bool IsRunning { get; private set; }
+        private bool IsSaving;
+        public static Server Instance { get; private set; }
+
+        public Server(WorldPersistence worldPersistence, World world, ServerConfig serverConfig, Communication.NetworkingLayer.NitroxServer server)
+        {
+            Instance = this;
+            this.worldPersistence = worldPersistence;
+            this.world = world;
+            this.server = server;
+
+            saveTimer = new Timer();
+            saveTimer.Interval = serverConfig.SaveInterval;
+            saveTimer.AutoReset = true;
+            saveTimer.Elapsed += delegate { Save(); };
+        }
 
         public void Save()
         {
-            worldPersistence.Save(world);
-        }
-
-        public Server(ServerConfig config)
-        {
-            serverConfiguration = config;
-            Instance = this;
-            worldPersistence = new WorldPersistence();
-            world = worldPersistence.Load();
-            packetHandler = new PacketHandler(world);
-            udpServer = new UdpServer(packetHandler, world.PlayerManager, world.EntitySimulation, serverConfiguration);
-            ConsoleCommandProcessor.RegisterCommands();
-
-            //Maybe add settings for the interval?
-            saveTimer = new Timer();
-            saveTimer.Interval = 60000;
-            saveTimer.AutoReset = true;
-            saveTimer.Elapsed += delegate
+            if (IsSaving)
             {
-                Save();
-            };
+                return;
+            }
+            IsSaving = true;
+            worldPersistence.Save(world);
+            IsSaving = false;
         }
 
         public void Start()
         {
+            IsRunning = true;
             IpLogger.PrintServerIps();
-            udpServer.Start();
+            server.Start();
             Log.Info("Nitrox Server Started");
             EnablePeriodicSaving();
         }
-        
+
         public void Stop()
         {
             Log.Info("Nitrox Server Stopping...");
             DisablePeriodicSaving();
             Save();
-            udpServer.Stop();
+            server.Stop();
             Log.Info("Nitrox Server Stopped");
+            IsRunning = false;
         }
-        
+
         private void EnablePeriodicSaving()
         {
             saveTimer.Start();
